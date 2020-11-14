@@ -1,0 +1,108 @@
+---
+title: "Shiny"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+install.packages("shiny")
+install.packages("shinythemes")
+```
+
+```{r load-packages, warning=FALSE, message=FALSE} 
+library(xts) ## 'r load-packages' command used above so Library is called during Knit process
+library(quantmod)
+library(data.table)
+library(ggplot2)
+library(gridExtra)
+library(fBasics)
+library(knitr)
+library(zoo)
+library(psych)
+library(kableExtra)
+library(tidyverse)
+library(lubridate)
+library(lfe)
+library(reshape2)
+library(boot)
+library(dplyr)
+library(RCurl) 
+library(packrat)
+library(rsconnect)
+library(officer)
+library(rvg) 
+library(scales)      # for formatting numbers
+library(magrittr)    # for the %>% operator
+library(devtools)  
+library(rJava)   
+library(customLayout) 
+library(here)
+library(glue)
+library(xlsx)
+library(shiny)
+```
+
+```{r} 
+####################################
+# Data Professor                   #
+# http://youtube.com/dataprofessor #
+# http://github.com/dataprofessor  #
+####################################
+
+# Modified from Winston Chang, 
+# https://shiny.rstudio.com/gallery/shiny-theme-selector.html
+
+# Concepts about Reactive programming used by Shiny, 
+# https://shiny.rstudio.com/articles/reactivity-overview.html
+
+# Load R packages
+library(shiny)
+library(shinythemes)
+
+
+  # Define UI
+  ui <- fluidPage(theme = shinytheme("cerulean"),
+    navbarPage(
+      # theme = "cerulean",  # <--- To use a theme, uncomment this
+      "My first app",
+      tabPanel("Navbar 1",
+               sidebarPanel(
+                 tags$h3("Input:"),
+                 textInput("txt1", "Given Name:", ""),
+                 textInput("txt2", "Surname:", ""),
+                 
+               ), # sidebarPanel
+               mainPanel(
+                            h1("Header 1"),
+                            
+                            h4("Output 1"),
+                            verbatimTextOutput("txtout"),
+
+               ) # mainPanel
+               
+      ), # Navbar 1, tabPanel
+      tabPanel("Navbar 2", "This panel is intentionally left blank"),
+      tabPanel("Navbar 3", "This panel is intentionally left blank")
+  
+    ) # navbarPage
+  ) # fluidPage
+
+  
+  # Define server function  
+  server <- function(input, output) {
+    
+    output$txtout <- renderText({
+      paste( input$txt1, input$txt2, sep = " " )
+    })
+  } # server
+  
+
+  # Create Shiny object
+  shinyApp(ui = ui, server = server)
+```
