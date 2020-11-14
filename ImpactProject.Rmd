@@ -1,0 +1,1304 @@
+---
+title: "FINM4411"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+
+Most of the early code here is not pertinent and just used for other regressions and to load stuff. Skip to **SKIP TO HERE** for more pertinent stuff. 
+
+Java Installation (used for Powerpoint interface)
+
+```{r}
+require(rJava)
+system("java -version")
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# hashtag is a comment that won't be executed
+# Clear the environment and console
+{cat("\014")  
+  rm(list=ls(all=TRUE))  
+  options(digits=6)} # display in 6 decimal places
+getwd()
+options(scipen = 999)
+#code used such that the e^x sign is not used 
+```
+
+Package Installation, not pertinent
+```{r, warning=FALSE, message=FALSE}
+#install.packages('quantmod')
+#install.packages('xts')
+#install.packages("ggplot2")
+#install.packages("data.table")
+#install.packages("gridExtra")
+#install.packages("knitr")
+#install.packages("zoo")
+#install.packages("psych")
+#install.packages("fBasics") ## online download, needed to find summary statistics
+#install.packages("kableExtra") ## online download, needed for Kable function
+#install.packages("tidyverse") ## online download, needed for pull() function
+#install.packages("lubridate")
+#install.packages("lfe")
+#install.packages("reshape2")
+#install.packages("boot")
+#install.packages("dplyr")
+#install.packages("RCurl")
+#install.packages("packrat")
+#install.packages("rsconnect")
+#install.packages("officer")
+#install.packages("rvg")
+#install.packages("scales")
+#install.packages("magrittr")
+#install.packages("devtools")
+#install.packages("here")
+#install.packages("glue")
+#install.packages("viridis") 
+#install.packages("xlsx")
+```
+Library call, not pertinent
+```{r load-packages, warning=FALSE, message=FALSE} 
+library(xts) ## 'r load-packages' command used above so Library is called during Knit process
+library(quantmod)
+library(data.table)
+library(ggplot2)
+library(gridExtra)
+library(fBasics)
+library(knitr)
+library(zoo)
+library(psych)
+library(kableExtra)
+library(tidyverse)
+library(lubridate)
+library(lfe)
+library(reshape2)
+library(boot)
+library(dplyr)
+library(RCurl) 
+library(packrat)
+library(rsconnect)
+library(officer)
+library(rvg) 
+library(scales)      # for formatting numbers
+library(magrittr)    # for the %>% operator
+library(devtools)  
+library(rJava)   
+library(customLayout) 
+library(here)
+library(glue)
+library(xlsx)
+```
+
+Preqin data download
+
+```{r}
+Preqin1 <- read.csv('Preqin1 Values Only.csv', row.names = NULL, stringsAsFactors = FALSE)
+## above code saves Preqin1 Values Only.csv data into the variable 'Preqin1'
+```
+
+OLS regression of Final Close Size - US MN vs Net IRR
+
+```{r, warning=FALSE, message=FALSE}
+mod <- lm(Preqin1$NET.IRR.... ~ Preqin1$FINAL.CLOSE.SIZE..USD.MN., na.exclude = TRUE) 
+## performs linear regression between Final Close Size - US MN vs Net IRR
+
+summary(mod)
+``` 
+
+Below code creates scatter plot of Fund Final Close Size vs IRR
+
+```{r, warning=FALSE, message=FALSE}
+
+plot(Preqin1$FINAL.CLOSE.SIZE..USD.MN., Preqin1$NET.IRR...., xlim=c(-100,2000), ylim=c(-100,500), main="Correlation of Final Close Size and Net IRR (%)", ylab = "Net IRR (%)", xlab = "Final Close Size - USD MN") 
+## above code plots points on the graph
+
+## plotting fitted Security Market Line (SML) using regression coefficients from Question 7.d
+ lines(Preqin1$NET.IRR...., -0.0005775 * Preqin1$NET.IRR.... + 15.9258121, col="red",lty=2)
+ legend(300, 400, legend=c("Linear Regression Close Size Vs Net IRR"),
+       col=c("red"), lty=1:2, cex=0.7)
+ legend(400, 300, legend=c("Final Close = -0.0005775 * Net IRR + 15.9258121"),
+       col=c("red"), lty=1:2, cex=0.5)
+``` 
+
+Preqin data download using different data set
+
+```{r}
+Preqin2<- read.csv('Preqin2 Values Only.csv', row.names = NULL, stringsAsFactors = FALSE)
+## above code saves Preqin2 Values Only.csv data into the variable 'Preqin2'
+```
+
+Sorts data by IRR, below shows the top 6 performing funds in the data set by Net IRR. As shown most funds are quite small with $322 Million beng the largest. All but 2 are venture capital firms. Surprisingly, 3 out of the 6 have vintage years before 2000 which is interesting how they maintained such returns for so long. Another interesting thing is that all but 2 of them are currently liquidated. Also, all but 1 fund were/are located in the US.
+
+```{r}
+TopIRR <- Preqin2[order(Preqin2$NET.IRR....),]
+#tail(TopIRR) use this command to view the data but it doesn't Knit to pdf well
+```
+
+Splitting data and for ease of use and finding basic mean IRR of US data
+
+```{r}
+Geo<-split(Preqin2,Preqin2$GEOGRAPHIC.FOCUS)
+USmean <- mean(Geo$US$NET.IRR....)
+```
+
+Creating dummy variables Vintage year using funds incepted before 2000 as Vin (Vintage)
+
+```{r}
+Condense <- as.data.frame(cbind(Preqin2$VINTAGE...INCEPTION.YEAR, Preqin2$NET.IRR....))
+colnames(Condense) <- c("Date","IRR")
+#creates data set with only Vintage and net IRR
+
+for(i in 1:length(Condense$Date))
+{
+    if(Condense[i,"Date"]<2000 & Condense[i,"Date"]>1995) 
+    {
+      Condense$Vin[i]=1
+    }
+    else
+    {
+      Condense$Vin[i]=0
+    }
+}
+```
+
+Creating dummy variables for Geographic Focus i.e. U.S. = 1, EUR = 0, ASIA = 0 for US data. Repeat process for different Geographic Focus areas.
+
+```{r}
+Condense2 <- as.data.frame(cbind(Preqin2$GEOGRAPHIC.FOCUS, Preqin2$NET.IRR....))
+colnames(Condense2) <- c("GeoFocus","IRR")
+#creates data set with only Geographic focus and net IRR data
+
+#Below code creates US dummy variable
+for(i in 1:length(Condense2$GeoFocus))
+{
+    if(Condense2[i,"GeoFocus"] == "US") 
+    {
+      Condense2$US[i]=1
+    }
+    else
+    {
+      Condense2$US[i]=0
+    }
+}
+
+#Below code creates Asia dummy variable
+for(i in 1:length(Condense2$GeoFocus))
+{
+    if(Condense2[i,"GeoFocus"] == "Asia") 
+    {
+      Condense2$Asia[i]=1
+    }
+    else
+    {
+      Condense2$Asia[i]=0
+    }
+}
+
+#Below code creates India dummy variable
+for(i in 1:length(Condense2$GeoFocus))
+{
+    if(Condense2[i,"GeoFocus"] == "India") 
+    {
+      Condense2$India[i]=1
+    }
+    else
+    {
+      Condense2$India[i]=0
+    }
+}
+
+#Below code creates Australia dummy variable
+for(i in 1:length(Condense2$GeoFocus))
+{
+    if(Condense2[i,"GeoFocus"] == "Australia") 
+    {
+      Condense2$Australia[i]=1
+    }
+    else
+    {
+      Condense2$Australia[i]=0
+    }
+}
+
+#Below code creates Africa dummy variable
+for(i in 1:length(Condense2$GeoFocus))
+{
+    if(Condense2[i,"GeoFocus"] == "Africa") 
+    {
+      Condense2$Africa[i]=1
+    }
+    else
+    {
+      Condense2$Africa[i]=0
+    }
+}
+
+#Below code creates Europe dummy variable
+for(i in 1:length(Condense2$GeoFocus))
+{
+    if(Condense2[i,"GeoFocus"] == "Europe") 
+    {
+      Condense2$Europe[i]=1
+    }
+    else
+    {
+      Condense2$Europe[i]=0
+    }
+}
+
+for(i in 1:length(Condense2$GeoFocus))
+{
+    if(Condense2[i,"GeoFocus"] == "Brazil") 
+    {
+      Condense2$Brazil[i]=1
+    }
+    else
+    {
+      Condense2$Brazil[i]=0
+    }
+}
+```
+  
+  
+Multiple Regression  
+```{r}  
+ols_no_int <- lm(Condense2$IRR ~ Condense2$US + Condense2$Asia + Condense2$India + Condense2$Australia + Condense2$Africa + Condense2$Brazil - 1 ) 
+# -1 means exclude intercept
+
+summary(ols_no_int)
+```
+
+T-Test to determine if there is a significant difference in the net IRR's of the U.S. and Australia
+
+```{r, warning=FALSE, message=FALSE}
+t.test(c(Geo$US$NET.IRR....),c(Geo$Australia$NET.IRR....))
+## Performs Welch Two Sample t-test
+```
+
+Cleaned Preqin Data
+```{r}
+Preqinclean<- read.csv('Calerecent.csv', row.names = NULL, stringsAsFactors = FALSE)
+## above code saves Calerecent.csv data into the variable 'Preqinclean'
+
+Preqin_mod <- as.data.frame(cbind(Preqinclean$NET.IRR...., Preqinclean$FUND.SIZE..USD.MN., Preqinclean$Market.rate...Y.N..., Preqinclean$Impact...Y.N..., Preqinclean$STRATEGY, Preqinclean$PRIMARY.REGION.FOCUS, Preqinclean$VINTAGE...INCEPTION.YEAR))
+colnames(Preqin_mod) <- c("IRR","Fundsize","Market_Rate?","Impact?", "Strategy","RegionFocus","Vintage")
+#creates data set with only Market Rate and net IRR data
+```
+
+Creating Dummy variables
+
+```{r}
+#Below code creates market return dummy variable
+for(i in 1:length(Preqin_mod$`Market_Rate?`))
+{
+    if(Preqin_mod[i,"Market_Rate?"] == "Y") 
+    {
+      Preqin_mod$MarketDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$MarketDUM[i]=0
+    }
+}
+
+head(Preqin_mod)
+
+#Below code creates impact dummy variable where dummy = 1 for Y
+for(i in 1:length(Preqinclean$Impact...Y.N...))
+{
+    if(Preqin_mod[i,"Impact?"] == "Y") 
+    {
+      Preqin_mod$ImpactDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$ImpactDUM[i]=0
+    }
+}
+
+
+#Creating more dummy variables for Strategy i.e. Early stage = 1, Growth = 0, Buyout = 0 for US data. Repeat process for different categorical strategies.
+
+#Below code strategy dummy variables
+for(i in 1:length(Preqin_mod$Strategy))
+{
+    if(Preqin_mod[i,"Strategy"] == "Early Stage") 
+    {
+      Preqin_mod$Early_StageDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Early_StageDUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$Strategy))
+{
+    if(Preqin_mod[i,"Strategy"] == "Growth") 
+    {
+      Preqin_mod$GrowthDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$GrowthDUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$Strategy))
+{
+    if(Preqin_mod[i,"Strategy"] == "Buyout") 
+    {
+      Preqin_mod$BuyoutDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$BuyoutDUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$Strategy))
+{
+    if(Preqin_mod[i,"Strategy"] == "Fund of Funds") 
+    {
+      Preqin_mod$Fund_of_FundsDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Fund_of_FundsDUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$Strategy))
+{
+    if(Preqin_mod[i,"Strategy"] == "Venture (General)") 
+    {
+      Preqin_mod$Venture_GeneralDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Venture_GeneralDUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$Strategy))
+{
+    if(Preqin_mod[i,"Strategy"] == "Early Stage: Seed") 
+    {
+      Preqin_mod$Early_Stage_SeedDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Early_Stage_SeedDUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$Strategy))
+{
+    if(Preqin_mod[i,"Strategy"] == "Co-Investment") 
+    {
+      Preqin_mod$Co_InvestmentDUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Co_InvestmentDUM[i]=0
+    }
+}
+
+#Below code creates North America dummy variable
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "North America") 
+    {
+      Preqin_mod$North_America_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$North_America_DUM[i]=0
+    }
+}
+
+#Below code creates Europe dummy variable
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "Europe") 
+    {
+      Preqin_mod$Europe_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Europe_DUM[i]=0
+    }
+}
+
+#Below code creates Asia dummy variable
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "Asia") 
+    {
+      Preqin_mod$Asia_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Asia_DUM[i]=0
+    }
+}
+
+#Below code creates Diversified Multi-Regional dummy variable
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "Diversified Multi-Regional") 
+    {
+      Preqin_mod$Diversified_Multi_Regional_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Diversified_Multi_Regional_DUM[i]=0
+    }
+}
+
+#Below code creates Americas dummy variable
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "Americas") 
+    {
+      Preqin_mod$Americas_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Americas_DUM[i]=0
+    }
+}
+
+#Below code creates Africa dummy variable
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "Africa") 
+    {
+      Preqin_mod$Africa_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Africa_DUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "Middle East & Israel") 
+    {
+      Preqin_mod$Middle_East_and_Israel_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Middle_East_and_Israel_DUM[i]=0
+    }
+}
+
+for(i in 1:length(Preqin_mod$RegionFocus))
+{
+    if(Preqin_mod[i,"RegionFocus"] == "Australasia") 
+    {
+      Preqin_mod$Australasia_DUM[i]=1
+    }
+    else
+    {
+      Preqin_mod$Australasia_DUM[i]=0
+    }
+}
+
+```
+
+Below code creates a matrix of dummy variables with 1969 - 2017 as columns and the length of the total dataset as rows.
+```{r}
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+k <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+n <- length(Preqinclean$NET.IRR....)
+
+
+IRR <- matrix(NA, nrow=n, ncol=k)
+
+for(j in 1:k){
+for(i in 1:n)
+{
+    if(Preqinclean$VINTAGE...INCEPTION.YEAR[i] == sum((min-1)+j)) 
+    {
+      IRR[i,j]=1
+    }
+    else
+    {
+      IRR[i,j]=0
+    }
+}
+}
+
+Vintage_all <- IRR[,1:k] 
+colnames(Vintage_all) <- c(1969:2017)
+Vintage <- Vintage_all[,c(1,3,4,8:49)]
+# above code removes vintage years with no data
+```
+
+**SKIP TO HERE**
+Multiple Regression for Dummy variables 
+```{r}  
+ols_no_int1 <- lm(Preqinclean$NET.IRR.... ~ Preqinclean$FUND.SIZE..USD.MN. + Vintage  + Preqin_mod$ImpactDUM + Preqin_mod$Early_StageDUM + Preqin_mod$GrowthDUM + Preqin_mod$BuyoutDUM + Preqin_mod$Fund_of_FundsDUM + Preqin_mod$Venture_GeneralDUM + Preqin_mod$Early_Stage_SeedDUM + Preqin_mod$Co_InvestmentDUM + Preqin_mod$North_America_DUM + Preqin_mod$Europe_DUM + Preqin_mod$Asia_DUM + Preqin_mod$Diversified_Multi_Regional_DUM + Preqin_mod$Americas_DUM + Preqin_mod$Africa_DUM + Preqin_mod$Middle_East_and_Israel_DUM - 1) 
+
+summary(ols_no_int1)
+
+ols.beta1 = matrix(NA, length(ols_no_int1$coefficients), 1)
+
+# below code used to make the chart of the coeffients
+for(i in 1:length(ols_no_int1$coefficients)){
+ ols.beta1[i] = ols_no_int1[1]$coefficients[i]
+ }
+
+plot.ols.beta1 = data.frame( y = ols.beta1, x = c(1:length(ols_no_int1$coefficients)))
+ggplot(plot.ols.beta1, aes(x, y)) + geom_col() + theme(text =
+element_text(size=12)) + ylab("Net IRR (%)") + xlab("") +
+ggtitle("Regression Coefficients")
+
+# creating a matrix for excel
+```
+
+Multiple Regression for Dummy variables with insignifant variables removed.
+```{r} 
+Vintage <- Vintage_all[,c(10,12:49)]
+# above code removes insignificant Vintage Dummy variables from model 1
+
+
+ols_no_int2 <- lm(Preqinclean$NET.IRR.... ~ Vintage + Preqin_mod$ImpactDUM + Preqin_mod$Fund_of_FundsDUM + Preqin_mod$Co_InvestmentDUM + Preqin_mod$Americas_DUM - 1) 
+
+# So far I have removed the insignificant vintage year dummy variables. Also I have removed: Early stage, Growth, Buyout, Venture General, Early Stage Seed strategies as well as Diversified Regionals and Africa as primary region focus area dummy variables. 
+
+summary(ols_no_int2)
+
+ols.beta2 = matrix(NA, length(ols_no_int2$coefficients), 1)
+
+# below code used to make the chart of the coeffients
+for(i in 1:length(ols_no_int2$coefficients)){
+ ols.beta2[i] = ols_no_int2[1]$coefficients[i]
+ }
+
+plot.ols.beta2 = data.frame( y = ols.beta2, x = c(1:length(ols_no_int2$coefficients)))
+ggplot(plot.ols.beta2, aes(x, y)) + geom_col() + theme(text =
+element_text(size=8)) + ylab("Factor loading") + xlab("") +
+ggtitle("Bar chart on factor loadings")
+```
+
+Multiple Regression for Dummy variables with all variables removed besides those of Signif. codes:  0 ‘***’.
+```{r} 
+Vintage <- Vintage_all[,c(18,20:30,33:37,39:49)]
+# above code creates a subset of vintage years which had a p-value of almost 0 (*** Significance code from model 1 regression1)
+
+ols_no_int3 <- lm(Preqinclean$NET.IRR.... ~ Vintage + Preqin_mod$Co_InvestmentDUM - 1) 
+
+summary(ols_no_int3)
+
+# below code used to make the chart of the coeffients
+ols.beta3 = matrix(NA, length(ols_no_int3$coefficients), 1)
+
+for(i in 1:length(ols_no_int3$coefficients)){
+ ols.beta3[i] = ols_no_int3[1]$coefficients[i]
+ }
+
+plot.ols.beta3 = data.frame( y = ols.beta3, x = c(1:29))
+ggplot(plot.ols.beta3, aes(x, y)) + geom_col() + theme(text =
+element_text(size=8)) + ylab("Factor loading") + xlab("") +
+ggtitle("Bar chart on factor loadings")
+```
+
+Checking the average of Impact and Non Impact to make sure our regression is correct.
+```{r}
+Impact.idx <- which(Preqinclean$Impact...Y.N...=="Y")
+meanImpactIRR <- mean(Preqinclean$NET.IRR....[Impact.idx])
+print(meanImpactIRR)
+# mean of Impact IRR
+
+nonImpact.idx <- which(Preqinclean$Impact...Y.N...=="N")
+mean_nonImpactIRR <- mean(Preqinclean$NET.IRR....[nonImpact.idx])
+print(mean_nonImpactIRR)
+# mean of non Impact IRR (every fund that is not impact)
+
+print(mean_nonImpactIRR - meanImpactIRR)
+# difference between the two. 
+# In most of our regressions the impact dummy was around -12. Therefore the impact dummy must mean how much less IRR impact funds get compared to standard funds on average
+
+# Now lets try the same thing with "Buyout" as a strategy to make sure we have our bearings for that correct also
+Buyout.idx <- which(Preqinclean$STRATEGY=="Buyout")
+meanBuyoutIRR <- mean(Preqinclean$NET.IRR....[Buyout.idx])
+print(meanBuyoutIRR)
+# mean of Buyout IRR
+
+nonBuyout.idx <- which(Preqinclean$STRATEGY!="Buyout")
+meannonBuyoutIRR <- mean(Preqinclean$NET.IRR....[nonBuyout.idx])
+print(meannonBuyoutIRR)
+# mean of non Buyout IRR
+
+print(meanBuyoutIRR - meannonBuyoutIRR)
+# again so the Dummy's we are getting for the Buyout Dum are around 1.5 which probably means that the buyout dummy's (or any strategy dummy's refer to just the premium or reduction in IRR if your fund is a Buyout fund compared to any other fund that is not Buyout)
+
+# The final check I will do is for the Vintage year Dummy variables. 
+vintage.idx <- which(Preqinclean$VINTAGE...INCEPTION.YEAR==2017)
+meanvintageIRR <- mean(Preqinclean$NET.IRR....[vintage.idx])
+print(meanvintageIRR)
+# above is the mean IRR for the vintage year of x. 
+
+# I'll check below
+allvintage.idx <- which(Preqinclean$VINTAGE...INCEPTION.YEAR!=2017)
+meanallvintageIRR <- mean(Preqinclean$NET.IRR....[allvintage.idx])
+print(meanallvintageIRR)
+
+print(meanvintageIRR - meanallvintageIRR)
+```
+
+Vintage Geo map code.
+
+```{r}
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(unique(Preqinclean$PRIMARY.REGION.FOCUS))
+vin_sum <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(Preqinclean$PRIMARY.REGION.FOCUS)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_sum[i,j]= sum(Preqinclean$FUND.SIZE..USD.MN.[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$PRIMARY.REGION.FOCUS==pick[j]))])/1000
+}
+}
+# above code creates a two variable (i,j) loop to populate the vintage year summation matrix. The vin_sum[i,j] refers to the matrix being populated. The loop uses various which() functions which pick out certain variables. The first which loop for i and j = 1 picks the list of African funds (by Primary region focus) that were stared in 1969. Once this list of creates it is run through the second which loop that picks the corresponding fund sizes. The loop then runs again for i and j for all vintage year dates and primary region focus areas.
+
+colnames(vin_sum) <- c(pick[1:length(x)])
+rownames(vin_sum) <- c(1969:2017)
+
+
+# Plot of the market size by Primary region focus - not cumulative. 
+df <- data.frame(vintage = 1969:2017, vin_sum)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Primary_Region_Focus')
+plot1 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Primary_Region_Focus)) +  ggtitle("Total New Market Issuances by Primary Region Focus USD bln(.)") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot1
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot1)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "1.pptx"
+    )
+  )
+```
+
+Vintage Geo map code restricted to smaller focus regions.
+
+```{r}
+restricted <- c("Americas","Africa","Australasia")
+
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(unique(restricted))
+
+vin_sum <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(restricted)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_sum[i,j]= sum(Preqinclean$FUND.SIZE..USD.MN.[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$PRIMARY.REGION.FOCUS==pick[j]))])/1000
+}
+}
+
+colnames(vin_sum) <- c(pick[1:length(x)])
+rownames(vin_sum) <- c(1969:2017)
+
+
+# Plot of the market size by Primary region focus - not cumulative. 
+df <- data.frame(vintage = 1969:2017, vin_sum)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Primary_Region_Focus')
+plot2 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Primary_Region_Focus)) +  ggtitle("New Market Issuances by Primary Region Focus - Restricted - USD bln(.)") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot2
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot2)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "2.pptx"
+    )
+  )
+```
+
+Vintage Strategy map code.
+
+```{r}
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(unique(Preqinclean$STRATEGY))
+vin_sum <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(Preqinclean$STRATEGY)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_sum[i,j]= sum(Preqinclean$FUND.SIZE..USD.MN.[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$STRATEGY==pick[j]))])/1000
+}
+}
+
+colnames(vin_sum) <- c(pick[1:length(x)])
+rownames(vin_sum) <- c(1969:2017)
+
+df <- data.frame(vintage = 1969:2017, vin_sum)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Strategy')
+plot3 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Strategy)) +  ggtitle("Total New Market Issuances by Strategy USD bln(.)") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot3
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot3)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "3.pptx"
+    )
+  )
+```
+
+Vintage Strategy map code restricted.
+
+```{r}
+restricted <- c("Buyout","Co-Investment","Growth","Turnaround")
+
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(unique(restricted))
+vin_sum <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(restricted)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_sum[i,j]= sum(Preqinclean$FUND.SIZE..USD.MN.[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$STRATEGY==pick[j]))])/1000
+}
+}
+
+colnames(vin_sum) <- c(pick[1:length(x)])
+rownames(vin_sum) <- c(1969:2017)
+
+df <- data.frame(vintage = 1969:2017, vin_sum)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Strategy')
+plot4 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Strategy)) +  ggtitle("Total New Market Issuances by Strategy - Restricted - USD bln(.)") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot4
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot4)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "4.pptx"
+    )
+  )
+```
+
+Vintage Core Industries map code.
+
+```{r}
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(unique(Preqinclean$CORE.INDUSTRIES))
+vin_sum <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(Preqinclean$CORE.INDUSTRIES)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_sum[i,j]= sum(Preqinclean$FUND.SIZE..USD.MN.[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$CORE.INDUSTRIES==pick[j]))])/1000
+}
+}
+
+colnames(vin_sum) <- c(pick[1:length(x)])
+rownames(vin_sum) <- c(1969:2017)
+
+df <- data.frame(vintage = 1969:2017, vin_sum)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Core_Industries')
+plot5 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Core_Industries)) +  ggtitle("Total New Market Issuances by Core Industries USD bln(.)") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot5
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot5)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "5.pptx"
+    )
+  )
+```
+
+Vintage Core Industries map code. Restricted
+
+```{r}
+restricted <- c("Healthcare","Energy & Utilities","Information Technology, Telecoms & Media")
+
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(unique(restricted))
+vin_sum <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(restricted)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_sum[i,j]= sum(Preqinclean$FUND.SIZE..USD.MN.[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$CORE.INDUSTRIES==pick[j]))])/1000
+}
+}
+
+colnames(vin_sum) <- c(pick[1:length(x)])
+rownames(vin_sum) <- c(1969:2017)
+
+df <- data.frame(vintage = 1969:2017, vin_sum)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Core_Industries')
+plot6 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Core_Industries)) +  ggtitle("Total New Market Issuances by Core Industries - Restricted - USD bln(.)") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot6
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot6)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "6.pptx"
+    )
+  )
+```
+
+Vintage Geo map code by IRR. Unrestricted.
+
+```{r}
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(unique(Preqinclean$PRIMARY.REGION.FOCUS))
+vin_mean <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(Preqinclean$PRIMARY.REGION.FOCUS)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_mean[i,j]= mean(Preqinclean$NET.IRR....[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$PRIMARY.REGION.FOCUS==pick[j]))])
+}
+}
+
+colnames(vin_mean) <- c(pick[1:length(x)])
+rownames(vin_mean) <- c(1969:2017)
+ 
+df <- data.frame(vintage = 1969:2017, vin_mean)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Primary_Region_Focus')
+plot7 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Primary_Region_Focus)) +  ggtitle("Mean Fund IRR by Vintage year and Primary Region Focus") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot7
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot7)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "7.pptx"
+    )
+  )
+```
+
+Vintage Geo map code by IRR.Restricted.
+
+```{r}
+restricted <- c("North America","Australasia","Europe")
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(restricted)
+vin_mean <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(restricted)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_mean[i,j]= mean(Preqinclean$NET.IRR....[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$PRIMARY.REGION.FOCUS==pick[j]))])
+}
+}
+
+colnames(vin_mean) <- c(pick[1:length(x)])
+rownames(vin_mean) <- c(1969:2017)
+ 
+df <- data.frame(vintage = 1969:2017, vin_mean)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Primary_Region_Focus')
+plot8 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Primary_Region_Focus)) +  ggtitle("Mean Fund IRR by Vintage year and Primary Region Focus") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot8
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot8)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "8.pptx"
+    )
+  )
+```
+
+Vintage Geo map code by IRR. Restricted. Impact only.
+
+```{r}
+restricted <- c("North America","Europe")
+impact_only<- read.csv('impactonly.csv', row.names = NULL, stringsAsFactors = FALSE)
+min <- min(impact_only$VINTAGE...INCEPTION.YEAR)
+n <- max(impact_only$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- length(restricted)
+vin_mean <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(restricted)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_mean[i,j]= mean(impact_only$NET.IRR....[intersect(which(impact_only$VINTAGE...INCEPTION.YEAR==(min-1+i)) ,which(impact_only$PRIMARY.REGION.FOCUS==pick[j]))])
+}
+}
+
+colnames(vin_mean) <- c(pick[1:length(x)])
+rownames(vin_mean) <- c(min:max(impact_only$VINTAGE...INCEPTION.YEAR))
+ 
+df <- data.frame(vintage = min:max(impact_only$VINTAGE...INCEPTION.YEAR), vin_mean)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Primary_Region_Focus')
+plot9 <-ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Primary_Region_Focus)) +  ggtitle("Mean Fund IRR by Vintage year - Restricted") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot9
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot9)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "9.pptx"
+    )
+  )
+```
+
+Impact vs non Impact.
+
+```{r}
+min <- min(Preqinclean$VINTAGE...INCEPTION.YEAR)
+n <- max(Preqinclean$VINTAGE...INCEPTION.YEAR)-min + 1
+k <- 2
+vin_sum <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- c("N","Y")
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+for(j in 1:k){
+for(i in 1:n)
+  {
+    vin_sum[i,j]= mean(Preqinclean$NET.IRR....[intersect(which(Preqinclean$VINTAGE...INCEPTION.YEAR==(1968+i)) ,which(Preqinclean$Impact...Y.N...==pick[j]))])
+}
+}
+
+colnames(vin_sum) <- c(pick[1:length(x)])
+rownames(vin_sum) <- c(1969:2017)
+
+df <- data.frame(vintage = 1969:2017, vin_sum)
+df <- reshape2::melt(df, id.vars = 'vintage',variable.name = 'Impact')
+plot10 <- ggplot(df, aes(vintage,value)) + geom_line(aes(colour = Impact)) +  ggtitle("Net IRR Impact vs non-Impact (%)") + theme(legend.position = "none" + scale_colour_manual(values=c(pick[1:k])))
+plot10
+```
+
+Export to Powerpoint
+
+```{r}
+p_dml <- rvg::dml(ggobj = plot10)
+# initialize PowerPoint slide ----
+officer::read_pptx() %>%
+  # add slide ----
+  officer::add_slide() %>%
+  # specify object and location of object ----
+  officer::ph_with(p_dml, ph_location()) %>%
+  # export slide -----
+  base::print(
+    target = here::here(
+      "10.pptx"
+    )
+  )
+```
+
+Estimation. 
+
+```{r}
+est_tableIN<- read.csv('est_tableIN.csv', row.names = NULL, stringsAsFactors = FALSE)
+
+colnames(est_tableIN) <- c("Estimate No.", "Fund Size (US mn)","Vintage Year","Impact Fund?","Strategy","Prim Focus","Estimate")
+
+coeff_table <- matrix(NA, nrow=length(names(ols_no_int1$coefficients)), ncol=4)
+# matrix for coefficent names
+
+colnames(coeff_table) <- c("Coefficient Name","Coefficient Model 1 Value","Coefficient Pr(>|t|)","Signif. code: 0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1")
+rownames(coeff_table) <- 1:length(names(ols_no_int1$coefficients))
+
+coeff_table[,1] <- names(ols_no_int1$coefficients)
+coeff_table[,2] = ols_no_int1$coefficients
+coeff_table[,3] = summary(ols_no_int1)$coefficients[,4]
+
+for(i in 1:length(names(ols_no_int1$coefficients)))
+{
+    if((coeff_table[i,3]<0.1) && (coeff_table[i,3]>0.05) )#regime1end is the last date where the regime is 1
+    {
+      coeff_table[i,4]="."
+    }
+}
+
+for(i in 1:length(names(ols_no_int1$coefficients)))
+{
+    if((coeff_table[i,3]<0.05) && (coeff_table[i,3]>0.01) )#regime1end is the last date where the regime is 1
+    {
+      coeff_table[i,4]="*"
+    }
+}
+
+for(i in 1:length(names(ols_no_int1$coefficients)))
+{
+    if((coeff_table[i,3]<0.01) && (coeff_table[i,3]>0.001) )#regime1end is the last date where the regime is 1
+    {
+      coeff_table[i,4]="**"
+    }
+}
+
+for(i in 1:length(names(ols_no_int1$coefficients)))
+{
+    if(coeff_table[i,3]<0.001)
+    {
+      coeff_table[i,4]="***"
+    }
+}
+
+for(i in 1:length(names(ols_no_int1$coefficients)))
+{
+    if(coeff_table[i,3]>0.1)
+    {
+      coeff_table[i,4]=""
+    }
+}
+
+unique(coeff_table[,1])
+
+for(i in 1:6)
+{
+est_tableIN[i,7] <- as.numeric(coeff_table[which(coeff_table[,1]=="Preqinclean$FUND.SIZE..USD.MN."),2])*est_tableIN[i,2] + ols_no_int1$coefficients[which(names(ols_no_int1$coefficients)==est_tableIN[i,3])] + if(est_tableIN[i,4]=="Y"){impact <- ols_no_int1$coefficients[which(names(ols_no_int1$coefficients)=="Preqin_mod$ImpactDUM")] }else{impact=0} + ols_no_int1$coefficients[which(names(ols_no_int1$coefficients)==est_tableIN[i,5])] + ols_no_int1$coefficients[which(names(ols_no_int1$coefficients)==est_tableIN[i,6])]
+}
+
+
+write.csv(coeff_table, "coeff_table.csv")
+#save matrix
+write.csv(est_tableIN, "Estimation.csv")
+
+```
+
+Dummy variables for Core Industries.
+
+```{r}
+n <- length(Preqinclean$NET.IRR....) 
+k <- length(unique(Preqinclean$CORE.INDUSTRIES))
+core_DUM <- matrix(NA, nrow=n, ncol=k)
+# base matrix for later population
+
+x <- unique(Preqinclean$CORE.INDUSTRIES)
+pick <- sample(x, length(x), replace = FALSE, prob = NULL)
+# above code picks random categorical data from primary region focus without replacement.
+
+
+for(j in 1:k){
+for(i in 1:n)
+{
+    if(Preqinclean$CORE.INDUSTRIES[i] == pick[j])
+    {
+      core_DUM[i,j]=1
+    }
+    else
+    {
+      core_DUM[i,j]=0
+    }
+}
+}
+
+colnames(core_DUM) <- c(pick[1:length(x)])
+```
+
+Adding numericals
+
+```{r}
+numericals <- matrix(NA, nrow=n, ncol=5)
+for(i in 1:n)
+{
+    if(Preqinclean$NET.MULTIPLE..X.[i]=="n/a")
+    {
+      numericals[i,1]=1
+    }
+   else
+    {
+      numericals[i,1]=Preqinclean$NET.MULTIPLE..X.[i]
+    }
+  
+  if(Preqinclean$RVPI....[i]=="n/a")
+    {
+      numericals[i,2]=0
+    }
+   else
+    {
+      numericals[i,2]=Preqinclean$RVPI....[i]
+    }
+  
+  if(Preqinclean$DPI....[i]=="n/a")
+    {
+      numericals[i,3]=0
+    }
+   else
+    {
+      numericals[i,3]=Preqinclean$DPI....[i]
+    }
+  
+  if(Preqinclean$CALLED....[i]=="n/a")
+    {
+      numericals[i,4]=100
+    }
+   else
+    {
+      numericals[i,4]=Preqinclean$CALLED....[i]
+    }
+  
+  if(Preqinclean$MEDIAN.BENCHMARK.NET.IRR....[i]=="n/a")
+    {
+      numericals[i,5]=10
+    }
+   else
+    {
+      numericals[i,5]=Preqinclean$MEDIAN.BENCHMARK.NET.IRR....[i]
+    }
+}
+```
+
+
+Making the model dataset
+```{r}
+Preqin_mod <- cbind(Preqin_mod,Vintage_all,core_DUM)
+Preqin_mod <- as.matrix(Preqin_mod)
+subset <- c(1:2,9:25,27:28,32:93)
+Preqin_mod <- Preqin_mod[,subset]
+Preqin_mod <- cbind(Preqin_mod,numericals)
+write.csv(Preqin_mod,'Preqin_mod.csv')
+```
