@@ -1,0 +1,98 @@
+---
+title: "Interface"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+{cat("\014")  
+  rm(list=ls(all=TRUE))}
+```
+
+```{r, results='hide', message=FALSE}
+#install.packages("shiny")
+#install.packages("shinythemes")
+#install.packages("shinyapps")
+```
+
+```{r, results='hide', message=FALSE}
+library(rsconnect)   
+library(devtools)  
+library(shiny)
+```
+
+```{r, results='hide', message=FALSE}
+
+# Load R packages
+library(shiny)
+library(shinythemes)
+
+# load coefficients
+coeff_table <- read.csv('coeff_table1.csv', row.names = NULL, stringsAsFactors = FALSE)
+coeff_table <- coeff_table[,-1]
+
+# defining coefficients
+size <- as.numeric(coeff_table[which(coeff_table[,1]=="Fund size"),2])
+impact <- coeff_table[47,2]
+
+  # Define UI
+  ui <- fluidPage(theme = shinytheme("cerulean"),
+    navbarPage(
+    theme = "cerulean",
+      "Estimation",
+      tabPanel("Regression",
+               sidebarPanel(
+                 tags$h3("Input:"),
+                 numericInput("num1", "Fund Size (US Millions):", ""),
+          
+  selectInput("select1", label = h3("Impact Status"), 
+    choices = list("Impact" = 1, "Non-Impact" = 0), 
+    selected = 1),
+  
+  sliderInput("slider1", label = h3("Vintage"), min = 1969, 
+        max = 2017, value = 1), 
+  
+    selectInput("select2", label = h3("Strategy"), 
+    choices = list("Early Stage", "Growth","Buyout","Fund of Funds","Venture General","Early Stage Seed","Co Investment"), 
+    selected = "Early Stage"),
+  
+      selectInput("select3", label = h3("Region Focus"), 
+    choices = list("North America", "Europe","Asia","Diversified Multi Regional","Americas","Africa","Middle East and Israel"), 
+    selected = "North America"),
+
+  
+               ), # sidebarPanel
+               mainPanel(
+                            h1("Result"),
+                            
+                            h4("Net IRR (%)"),
+                            verbatimTextOutput("value"),
+
+               ) # mainPanel
+               
+      ), # Navbar 1, tabPanel
+      tabPanel("Link", "https://github.com/regansmith202/github_respository")
+
+  
+    ) # navbarPage
+  ) # fluidPage
+
+  
+  # Define server function  
+  server <- function(input, output) {
+    
+    output$value <- renderPrint({ input$num1*size + as.numeric(input$select1)*impact + coeff_table[which(coeff_table[,1]==input$slider1),2] + coeff_table[which(coeff_table[,1]==input$select2),2] + coeff_table[which(coeff_table[,1]==input$select3),2]
+    })
+  } # server
+  
+
+```
+
+```{r}
+  # Create Shiny object
+  shinyApp(ui = ui, server = server)
+```
