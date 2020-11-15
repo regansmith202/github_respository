@@ -1,0 +1,83 @@
+---
+title: "Interface"
+output:
+  html_document: default
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+{cat("\014")  
+  rm(list=ls(all=TRUE))}
+```
+
+```{r, results='hide', message=FALSE}
+#install.packages("shiny")
+#install.packages("shinythemes")
+#install.packages("shinyapps")
+```
+
+```{r, results='hide', message=FALSE}
+library(rsconnect)   
+library(devtools)  
+library(shiny)
+library(shinythemes)
+```
+
+```{r, results='hide', message=FALSE}
+# load coefficients
+coeff_table <- read.csv('coeff_table1.csv', row.names = NULL, stringsAsFactors = FALSE)
+coeff_table <- coeff_table[,-1]
+
+  # Define UI
+  ui <- fluidPage(theme = shinytheme("cerulean"),
+    navbarPage(
+    theme = "cerulean",
+      "Regression",
+      tabPanel("Coefficients", sidebarPanel(
+                 
+    selectInput("select1", label = h4("Coefficient"), 
+    choices = coeff_table[,1], 
+    selected = "Fund size"),
+
+
+  
+               ), # sidebarPanel
+               mainPanel(
+                            h1("Result"),
+                            
+                            h4("Coefficient:"),
+                            verbatimTextOutput("value1"),
+                            
+                            h4("P-value:"),
+                            verbatimTextOutput("value2"),
+                            
+                            h4("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1"),
+                            verbatimTextOutput("value3"),
+                            
+
+                            
+
+               ) # mainPanel
+               
+      ), # Navbar 1, tabPanel
+      tabPanel("Link", "https://github.com/regansmith202/github_respository")
+
+  
+    )# navbarPage
+ ) # fluidPage
+
+  
+  # Define server function  
+  server <- function(input, output) {
+    
+  output$value1 <- renderPrint({coeff_table[which(coeff_table[,1]==input$select1),2]})
+  output$value2 <- renderPrint({coeff_table[which(coeff_table[,1]==input$select1),3]})
+  output$value3 <- renderPrint({coeff_table[which(coeff_table[,1]==input$select1),4]})
+  }
+```
+
+```{r}
+  # Create Shiny object
+shinyApp(ui = ui, server = server)
+```
